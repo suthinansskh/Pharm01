@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทดสอบระบบ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold text-center mb-6">🔧 ทดสอบระบบ</h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h2 class="text-xl font-semibold mb-4">1. ทดสอบการเชื่อมต่อ Google Apps Script</h2>
+            <button onclick="testConnection()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                ทดสอบการเชื่อมต่อ
+            </button>
+            <div id="connection-result" class="mt-2"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h2 class="text-xl font-semibold mb-4">2. ทดสอบการบันทึกข้อมูล</h2>
+            <button onclick="testSave()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                ทดสอบการบันทึก
+            </button>
+            <div id="save-result" class="mt-2"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h2 class="text-xl font-semibold mb-4">3. ทดสอบการเพิ่มกิจกรรม</h2>
+            <button onclick="testAddActivity()" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 mr-2">
+                ทดสอบเพิ่มกิจกรรม
+            </button>
+            <button onclick="testDeleteActivity()" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mr-2">
+                ทดสอบลบกิจกรรม
+            </button>
+            <button onclick="testDeleteByName()" class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
+                ลบกิจกรรมเก่า
+            </button>
+            <div id="activity-result" class="mt-2"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+            <h2 class="text-xl font-semibold mb-4">4. ทดสอบการโหลดข้อมูล</h2>
+            <button onclick="testLoad()" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                ทดสอบการโหลดข้อมูล
+            </button>
+            <div id="load-result" class="mt-2"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">5. ข้อมูล Debug</h2>
+            <div id="debug-info" class="text-sm text-gray-600"></div>
+            
+            <!-- คำแนะนำการ Deploy -->
+            <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h3 class="font-semibold text-yellow-800 mb-2">🔧 หากฟังก์ชันใหม่ไม่ทำงาน:</h3>
+                <ol class="list-decimal list-inside text-sm text-yellow-700 space-y-1">
+                    <li>เปิด <a href="https://script.google.com" target="_blank" class="text-blue-600 underline">Google Apps Script</a></li>
+                    <li>เปิดโปรเจค "Pharm_event"</li>
+                    <li>คลิก Deploy → Manage deployments</li>
+                    <li>คลิกไอคอน Edit (✏️) ข้างเวอร์ชันปัจจุบัน</li>
+                    <li>เปลี่ยน Version เป็น "New version"</li>
+                    <li>คลิก Deploy</li>
+                    <li>รอสักครู่แล้วทดสอบใหม่</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSHNJ4N2r30OFlYvnOhs5VlVkJHY66_RdvsKIsoi7JXm0MTTFNW41Q__1XdCf3WYDxQw/exec";
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const colors = {
+                success: 'text-green-600 bg-green-50 border-green-200',
+                error: 'text-red-600 bg-red-50 border-red-200',
+                info: 'text-blue-600 bg-blue-50 border-blue-200'
+            };
+            element.innerHTML = `<div class="p-2 border rounded ${colors[type]}">${message}</div>`;
+        }
+
+        async function fetchFromScript(action, payload = {}) {
+            try {
+                console.log('🚀 Attempting to fetch:', action, payload);
+                
+                const params = new URLSearchParams({ 
+                    action, 
+                    data: JSON.stringify(payload) 
+                });
+                
+                const fullUrl = `${SCRIPT_URL}?${params}`;
+                console.log('🔗 Full URL:', fullUrl);
+                
+                const response = await fetch(fullUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                console.log('📨 Response status:', response.status);
+                console.log('📨 Response ok:', response.ok);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Response error text:', errorText);
+                    throw new Error(`เกิดข้อผิดพลาดจาก Server: ${response.status} - ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log('✅ Response result:', result);
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Fetch error:', error);
+                throw error;
+            }
+        }
+
+        async function testConnection() {
+            showResult('connection-result', '⏳ กำลังทดสอบการเชื่อมต่อ...', 'info');
+            try {
+                const result = await fetchFromScript('getInitialData');
+                if (result.status === 'success') {
+                    showResult('connection-result', `✅ การเชื่อมต่อสำเร็จ! พบกิจกรรม ${result.activities.length} รายการ`, 'success');
+                } else {
+                    showResult('connection-result', `❌ การเชื่อมต่อล้มเหลว: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('connection-result', `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSave() {
+            showResult('save-result', '⏳ กำลังทดสอบการบันทึก...', 'info');
+            try {
+                const testPayload = {
+                    pscode: 'P01', // เพิ่ม PScode ที่มีอยู่ในระบบ
+                    activity: 'กิจกรรมทดสอบ Auto ID 16:44:48', // ใช้ชื่อกิจกรรมที่เพิ่งสร้าง
+                    round: '1',
+                    image: null,
+                    coordinates: 'Test Location',
+                    latitude: 13.7563,
+                    longitude: 100.5018
+                };
+                
+                console.log('📤 Test save payload:', testPayload);
+                
+                const response = await fetchFromScript('addRecord', testPayload);
+                if (response.status === 'success') {
+                    showResult('save-result', `✅ การบันทึกสำเร็จ! ID: ${response.record?.idrecord}`, 'success');
+                } else {
+                    showResult('save-result', `❌ การบันทึกล้มเหลว: ${response.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('save-result', `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAddActivity() {
+            showResult('activity-result', '⏳ กำลังทดสอบการเพิ่มกิจกรรม (รหัสอัตโนมัติ)...', 'info');
+            try {
+                const testActivity = {
+                    activityId: '', // ไม่ส่งรหัส ให้สร้างอัตโนมัติ
+                    activityName: 'กิจกรรมทดสอบ Auto ID ' + new Date().toLocaleTimeString('th-TH'),
+                    activityDate: '2025-09-05',
+                    round: 1,
+                    buddhistYear: 2568
+                };
+                
+                const response = await fetchFromScript('addActivity', testActivity);
+                if (response.status === 'success') {
+                    showResult('activity-result', `✅ เพิ่มกิจกรรมสำเร็จ! รหัสที่สร้าง: ${response.activityId}`, 'success');
+                } else {
+                    showResult('activity-result', `❌ การเพิ่มกิจกรรมล้มเหลว: ${response.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('activity-result', `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDeleteActivity() {
+            showResult('activity-result', '⏳ กำลังทดสอบการลบกิจกรรม...', 'info');
+            try {
+                // ลองลบ activity ที่เพิ่งสร้าง (ใช้ชื่อแทนรหัส)
+                const response = await fetchFromScript('deleteActivity', { name: 'กิจกรรมทดสอบ Auto ID 16:44:48' });
+                if (response.status === 'success') {
+                    showResult('activity-result', `✅ ลบกิจกรรมสำเร็จ!`, 'success');
+                } else {
+                    showResult('activity-result', `❌ การลบกิจกรรมล้มเหลว: ${response.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('activity-result', `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDeleteByName() {
+            showResult('activity-result', '⏳ กำลังลบกิจกรรมเก่า...', 'info');
+            try {
+                // ลองลบ activity เก่าที่มีอยู่
+                const response = await fetchFromScript('deleteActivity', { name: 'test' });
+                if (response.status === 'success') {
+                    showResult('activity-result', `✅ ลบกิจกรรม "test" สำเร็จ!`, 'success');
+                } else {
+                    showResult('activity-result', `❌ การลบกิจกรรม "test" ล้มเหลว: ${response.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('activity-result', `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            }
+        }
+
+        async function testLoad() {
+            showResult('load-result', '⏳ กำลังทดสอบการโหลด...', 'info');
+            try {
+                const result = await fetchFromScript('getDashboardData', { year: 2025, round: 1 });
+                if (result.status === 'success') {
+                    showResult('load-result', `✅ การโหลดสำเร็จ! พบข้อมูล ${result.records?.length || 0} รายการ`, 'success');
+                } else {
+                    showResult('load-result', `❌ การโหลดล้มเหลว: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showResult('load-result', `❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            }
+        }
+
+        function updateDebugInfo() {
+            const debugElement = document.getElementById('debug-info');
+            debugElement.innerHTML = `
+                <strong>Browser Info:</strong><br>
+                - User Agent: ${navigator.userAgent}<br>
+                - Geolocation Available: ${navigator.geolocation ? 'Yes' : 'No'}<br>
+                - Local Time: ${new Date().toLocaleString('th-TH')}<br>
+                <br>
+                <strong>Script URL:</strong><br>
+                ${SCRIPT_URL}
+            `;
+        }
+
+        // เริ่มต้น
+        window.addEventListener('load', () => {
+            updateDebugInfo();
+        });
+    </script>
+</body>
+</html>

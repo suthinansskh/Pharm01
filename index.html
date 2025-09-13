@@ -1,0 +1,1629 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แอปบันทึกและสรุปกิจกรรม</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for a modern look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+        /* Simple loader animation */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="container mx-auto max-w-4xl">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">ระบบบันทึกและสรุปผลกิจกรรม</h1>
+            <p class="text-gray-600 mt-2">Activity Recording & Dashboard</p>
+        </header>
+
+        <main class="bg-white p-6 rounded-2xl shadow-lg">
+            <!-- Navigation Tabs -->
+            <div class="border-b border-gray-200">
+                <nav class="flex -mb-px space-x-6" aria-label="Tabs">
+                    <button id="tab-record" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg text-indigo-600 border-indigo-500">
+                        บันทึกกิจกรรม
+                    </button>
+                    <button id="tab-dashboard" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Dashboard
+                    </button>
+                    <button id="tab-activities" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-lg text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        ตั้งค่ากิจกรรม
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Message/Status Display Area -->
+            <div id="message-area" class="my-4 p-4 rounded-lg text-center text-white font-semibold hidden"></div>
+
+            <!-- View: Record Activity -->
+            <div id="view-record" class="mt-6">
+                <form id="activity-form" class="space-y-6">
+                    <div>
+                        <label for="user-pscode" class="block text-sm font-medium text-gray-700">รหัสประจำตัว (PScode)</label>
+                        <input type="text" id="user-pscode" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="กรอกรหัสประจำตัวของคุณ">
+                        <div id="user-info" class="mt-2 text-sm text-gray-600 hidden"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="activity-select" class="block text-sm font-medium text-gray-700">เลือกกิจกรรม</label>
+                            <select id="activity-select" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option>กำลังโหลดรายการกิจกรรม...</option>
+                            </select>
+                        </div>
+                        <div>
+                             <label for="activity-round" class="block text-sm font-medium text-gray-700">รอบที่ (Round)</label>
+                             <select id="activity-round" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="">เลือกรอบ</option>
+                                <option value="1">รอบ 1</option>
+                                <option value="2">รอบ 2</option>
+                             </select>
+                        </div>
+                    </div>
+
+                    <!-- แสดงข้อมูลกิจกรรมที่เลือก -->
+                    <div id="activity-details" class="bg-blue-50 p-4 rounded-lg hidden">
+                        <h3 class="text-sm font-medium text-blue-800 mb-2">ข้อมูลกิจกรรมที่เลือก</h3>
+						<div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-600">วันที่จัด:</span>
+                                <span id="activity-date" class="font-medium text-gray-800 ml-2">-</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">รอบ:</span>
+                                <span id="activity-round-display" class="font-medium text-gray-800 ml-2">-</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">ปี พ.ศ.:</span>
+                                <span id="activity-year" class="font-medium text-gray-800 ml-2">-</span>
+                            </div>
+							<div>
+								<span class="text-gray-600">สถานะ:</span>
+								<span id="activity-status" class="font-medium ml-2 text-green-600">-</span>
+							</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="image-upload" class="block text-sm font-medium text-gray-700">
+                            อัปโหลดภาพถ่าย <span class="text-gray-400 font-normal">(ไม่บังคับ)</span>
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <input type="file" id="image-upload" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100">
+                            <button type="button" id="clear-image" class="hidden mt-1 px-3 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200" onclick="clearImageUpload()">
+                                ล้าง
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">ขนาดไฟล์ไม่เกิน 5MB (รองรับ: JPG, PNG, WEBP) • <strong>สามารถข้ามได้</strong></p>
+                        <div id="image-preview" class="mt-2 hidden">
+                            <img id="preview-img" class="w-32 h-32 object-cover rounded-lg border" alt="ตัวอย่างภาพ">
+                            <p class="text-xs text-gray-500 mt-1">ตัวอย่างภาพที่เลือก</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">ข้อมูลตำแหน่ง (GPS)</label>
+                        <div id="location-status" class="mt-1 text-sm text-gray-600 bg-gray-50 p-3 rounded-md">
+                            กำลังขอพิกัด...
+                        </div>
+                        <div id="coordinates-display" class="mt-2 text-xs text-gray-500 hidden">
+                            <span class="font-medium">พิกัด:</span> <span id="coords-text">-</span>
+                        </div>
+                    </div>
+
+                    <!-- ข้อมูลที่จะบันทึก (สำหรับตรวจสอบ) -->
+                    <div id="record-summary" class="bg-green-50 p-4 rounded-lg hidden">
+                        <h3 class="text-sm font-medium text-green-800 mb-2">ข้อมูลที่จะบันทึก</h3>
+                        <div class="text-sm space-y-1 text-gray-700">
+                            <div><span class="font-medium">ผู้บันทึก:</span> <span id="summary-user">-</span></div>
+                            <div><span class="font-medium">กิจกรรม:</span> <span id="summary-activity">-</span></div>
+                            <div><span class="font-medium">วันที่จัด:</span> <span id="summary-date">-</span></div>
+                            <div><span class="font-medium">รอบ:</span> <span id="summary-round">-</span></div>
+                            <div><span class="font-medium">ปี:</span> <span id="summary-year">-</span></div>
+                            <div><span class="font-medium">ภาพ:</span> <span id="summary-image" class="text-gray-500">ไม่มีการแนบภาพ</span></div>
+                            <div><span class="font-medium">พิกัด:</span> <span id="summary-coords">-</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="showUpdateURLDialog()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            ตั้งค่า URL
+                        </button>
+                        <button type="button" onclick="testConnection()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.416 1.75-.956l11.5 6.347c.833.46.833 1.653 0 2.113l-11.5 6.347c-.833.46-1.75-.1-1.75-.956V5.653Z" />
+                            </svg>
+                            ทดสอบการเชื่อมต่อ
+                        </button>
+                        <button type="submit" class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                             <svg id="submit-icon" class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            <span id="submit-text">บันทึกข้อมูล</span>
+                            <div id="submit-loader" class="loader w-5 h-5 ml-2 hidden"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- View: Dashboard -->
+            <div id="view-dashboard" class="mt-6 hidden">
+                <div class="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="flex-1">
+                        <label for="year-filter" class="block text-sm font-medium text-gray-700">เลือกปี</label>
+                        <select id="year-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <!-- Year options will be populated here -->
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="round-filter" class="block text-sm font-medium text-gray-700">เลือกรอบ</label>
+                        <select id="round-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <!-- Round options will be populated here -->
+                        </select>
+                    </div>
+                    <div class="self-end">
+                         <button id="load-dashboard-btn" class="w-full md:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            แสดงผล
+                        </button>
+                    </div>
+                </div>
+
+                <div id="dashboard-results" class="space-y-4">
+                    <div class="text-center p-8 text-gray-500">
+                        โปรดเลือกปีและรอบที่ต้องการ แล้วกด "แสดงผล"
+                    </div>
+                </div>
+                 <div id="dashboard-loader" class="flex justify-center p-8 hidden">
+                    <div class="loader"></div>
+                </div>
+            </div>
+
+            <!-- View: Activity Management -->
+            <div id="view-activities" class="mt-6 hidden">
+                <div class="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-lg mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">🎯 จัดการรายการกิจกรรม</h2>
+                    <p class="text-gray-600">เพิ่ม แก้ไข หรือลบรายการกิจกรรมต่างๆ ที่ใช้ในการบันทึก</p>
+                </div>
+
+                <!-- Add Activity Form -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">➕ เพิ่มกิจกรรมใหม่</h3>
+                    <form id="add-activity-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label for="activity-id" class="block text-sm font-medium text-gray-700">
+                                    รหัสกิจกรรม (ไม่บังคับ)
+									<span class="text-gray-500 text-xs">- ระบบสร้างอัตโนมัติรูปแบบ: ACT[ปี][รอบ][ลำดับ] (ปิดการแก้ไข)</span>
+                                </label>
+								<input type="text" id="activity-id" disabled
+									   class="mt-1 block w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-md shadow-sm sm:text-sm cursor-not-allowed"
+									   placeholder="จะสร้างอัตโนมัติเมื่อบันทึก" value="(Auto)">
+                                <div id="activity-id-preview" class="mt-1 text-sm text-indigo-600"></div>
+                            </div>
+                            <div>
+                                <label for="activity-name" class="block text-sm font-medium text-gray-700">ชื่อกิจกรรม</label>
+                                <input type="text" id="activity-name" required 
+                                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                       placeholder="เช่น การตรวจเยี่ยมบ้าน">
+                            </div>
+                            <div>
+								<label for="activity-date-input" class="block text-sm font-medium text-gray-700">วันที่จัด</label>
+								<input type="date" id="activity-date-input" required 
+                                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="activity-round-input" class="block text-sm font-medium text-gray-700">รอบ</label>
+                                <input type="number" id="activity-round-input" required min="1" max="2" value="1"
+                                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                       placeholder="1-2">
+                            </div>
+                            <div>
+                                <label for="activity-year-input" class="block text-sm font-medium text-gray-700">ปี พ.ศ.</label>
+                                <input type="number" id="activity-year-input" required min="2560" max="2600" value="2568"
+                                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                       placeholder="2567">
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                เพิ่มกิจกรรม
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Activity List -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">📋 รายการกิจกรรมทั้งหมด</h3>
+                        <button onclick="refreshActivityList()" class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <svg class="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            รีเฟรช
+                        </button>
+                    </div>
+                    
+                    <!-- Search and Filter -->
+                    <div class="mb-4 flex flex-col sm:flex-row gap-3">
+                        <div class="flex-1">
+                            <input type="text" id="activity-search" placeholder="🔍 ค้นหากิจกรรม..."
+                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <select id="year-filter-activities" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="">ทุกปี</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Activities Table -->
+                    <div class="overflow-x-auto">
+                        <div id="activities-loader" class="flex justify-center p-8 hidden">
+                            <div class="loader"></div>
+                        </div>
+                        <div id="activities-table-container">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อกิจกรรม</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่จัด</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รอบ</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ปี</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activities-table-body" class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                            กำลังโหลดข้อมูล...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+	<script>
+		// --- CONFIGURATION ---
+		// !!! IMPORTANT !!!
+		// Google Apps Script Web App URL ที่ใช้งานจริง
+		// หากมีปัญหา ให้ทำการ Deploy ใหม่และเปลี่ยน URL ด้านล่างนี้
+		const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSHNJ4N2r30OFlYvnOhs5VlVkJHY66_RdvsKIsoi7JXm0MTTFNW41Q__1XdCf3WYDxQw/exec";
+		
+		// URL สำรองกรณีที่ URL หลักไม่ทำงาน
+		const BACKUP_SCRIPT_URL = ""; // ใส่ URL สำรองที่นี่หากมี
+		
+		// ตรวจสอบ URL ก่อนใช้งาน
+		function validateScriptURL() {
+			const currentURL = window.SCRIPT_URL || SCRIPT_URL;
+			if (!currentURL || currentURL === "") {
+				throw new Error("❌ ไม่พบ Google Apps Script URL กรุณาตั้งค่า SCRIPT_URL ให้ถูกต้อง");
+			}
+			if (!currentURL.includes("script.google.com/macros")) {
+				throw new Error("❌ URL ไม่ถูกต้อง กรุณาใช้ URL จาก Google Apps Script deployment");
+			}
+			console.log("✅ Script URL validated:", currentURL);
+			return currentURL;
+		}
+
+		// --- DOM ELEMENTS ---
+		const tabRecord = document.getElementById('tab-record');
+		const tabDashboard = document.getElementById('tab-dashboard');
+		const tabActivities = document.getElementById('tab-activities');
+		const viewRecord = document.getElementById('view-record');
+		const viewDashboard = document.getElementById('view-dashboard');
+		const viewActivities = document.getElementById('view-activities');
+		const activityForm = document.getElementById('activity-form');
+		const activitySelect = document.getElementById('activity-select');
+		const activityRound = document.getElementById('activity-round');
+		const imageUpload = document.getElementById('image-upload');
+		const locationStatus = document.getElementById('location-status');
+		const messageArea = document.getElementById('message-area');
+		const submitBtnText = document.getElementById('submit-text');
+		const submitBtnLoader = document.getElementById('submit-loader');
+		
+		// New elements for updated form
+		const userPscode = document.getElementById('user-pscode');
+		const userInfo = document.getElementById('user-info');
+		const activityDetails = document.getElementById('activity-details');
+		const activityDate = document.getElementById('activity-date');
+		const activityRoundDisplay = document.getElementById('activity-round-display');
+		
+		// Activity Management elements
+		const addActivityForm = document.getElementById('add-activity-form');
+		const activitiesTableBody = document.getElementById('activities-table-body');
+		const activitiesLoader = document.getElementById('activities-loader');
+		const activitySearch = document.getElementById('activity-search');
+		const yearFilterActivities = document.getElementById('year-filter-activities');
+		const activityYear = document.getElementById('activity-year');
+		const imagePreview = document.getElementById('image-preview');
+		const previewImg = document.getElementById('preview-img');
+		const coordinatesDisplay = document.getElementById('coordinates-display');
+		const coordsText = document.getElementById('coords-text');
+		const recordSummary = document.getElementById('record-summary');
+		
+		// Dashboard elements
+		const yearFilter = document.getElementById('year-filter');
+		const roundFilter = document.getElementById('round-filter');
+		const loadDashboardBtn = document.getElementById('load-dashboard-btn');
+		const dashboardResults = document.getElementById('dashboard-results');
+		const dashboardLoader = document.getElementById('dashboard-loader');
+
+		// --- STATE ---
+		let userCoordinates = null;
+		let isSubmitting = false;
+		let currentUser = null;
+		let currentActivities = null;
+		let currentCoordinates = null;
+
+		// --- FUNCTIONS ---
+
+		/**
+		 * Shows a message to the user.
+		 * @param {string} text - The message text.
+		 * @param {('success'|'error')} type - The message type.
+		 */
+		function showMessage(text, type) {
+			messageArea.textContent = text;
+			messageArea.className = `my-4 p-4 rounded-lg text-center font-semibold ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`;
+			messageArea.classList.remove('hidden');
+			setTimeout(() => messageArea.classList.add('hidden'), 5000);
+		}
+
+		/**
+		 * ตรวจสอบข้อมูลผู้ใช้จาก PScode
+		 */
+		async function checkUser(pscode) {
+			if (!pscode || pscode.length < 3) {
+				userInfo.classList.add('hidden');
+				return;
+			}
+			
+			try {
+				const response = await fetchFromScript('getUserInfo', { pscode });
+				if (response.status === 'success') {
+					currentUser = response.user;
+					userInfo.innerHTML = `
+						<div class="text-green-600">
+							<span class="font-medium">${currentUser.fullName}</span> | 
+							${currentUser.group} | ${currentUser.level} | 
+							${currentUser.department || 'ไม่ระบุหน่วยงาน'}
+						</div>
+					`;
+					userInfo.classList.remove('hidden');
+					updateRecordSummary();
+				} else {
+					currentUser = null;
+					userInfo.innerHTML = `<div class="text-red-600">ไม่พบข้อมูลผู้ใช้ กรุณาลงทะเบียนก่อน</div>`;
+					userInfo.classList.remove('hidden');
+				}
+			} catch (error) {
+				console.error('Error checking user:', error);
+				userInfo.innerHTML = `<div class="text-red-600">เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้</div>`;
+				userInfo.classList.remove('hidden');
+			}
+		}
+
+		/**
+		 * อัปเดตข้อมูลกิจกรรมเมื่อเลือกกิจกรรม
+		 */
+		function updateActivityDetails(selectedActivity) {
+			if (!selectedActivity || !currentActivities) {
+				activityDetails.classList.add('hidden');
+				// ไม่ clear ค่า round ที่ user เลือกแล้ว
+				return;
+			}
+
+			const activity = currentActivities.find(act => act.name === selectedActivity);
+			if (activity) {
+				activityDate.textContent = activity.date || 'ไม่ระบุ';
+				activityRoundDisplay.textContent = activity.round || 'ไม่ระบุ';
+				activityYear.textContent = activity.buddhistYear || 'ไม่ระบุ';
+				// กำหนดสถานะ (ถ้ามีฟิลด์ status ใช้ค่านั้น ไม่งั้น default = true)
+				const statusEl = document.getElementById('activity-status');
+				let statusValue = (typeof activity.status !== 'undefined') ? activity.status : true;
+				const statusText = statusValue === true || statusValue === 'true' || statusValue === 1 ? 'ใช้งาน' : 'ปิด';
+				statusEl.textContent = statusText;
+				statusEl.className = 'font-medium ml-2 ' + (statusText === 'ใช้งาน' ? 'text-green-600' : 'text-red-600');
+				// ตั้งค่ารอบใน select ให้ตรงกับกิจกรรมเสมอ (ลดปัญหาลืมเลือก)
+				activityRound.value = activity.round || '';
+				activityRound.classList.remove('border-red-500');
+				activityDetails.classList.remove('hidden');
+				updateRecordSummary();
+			}
+		}
+
+		/**
+		 * แสดงตัวอย่างภาพที่เลือก
+		 */
+		function previewImage(file) {
+			if (file) {
+				const reader = new FileReader();
+				reader.onload = function(e) {
+					previewImg.src = e.target.result;
+					imagePreview.classList.remove('hidden');
+					updateRecordSummary();
+				};
+				reader.readAsDataURL(file);
+			}
+		}
+
+		/**
+		 * ล้างข้อมูลการอัปโหลดภาพ
+		 */
+		function clearImageUpload() {
+			imageUpload.value = '';
+			imagePreview.classList.add('hidden');
+			document.getElementById('clear-image').classList.add('hidden');
+			updateRecordSummary();
+		}
+
+		/**
+		 * อัปเดตการแสดงพิกัด
+		 */
+		function updateCoordinatesDisplay(latitude, longitude) {
+			if (latitude && longitude) {
+				const coords = `${latitude}, ${longitude}`;
+				coordsText.textContent = coords;
+				coordinatesDisplay.classList.remove('hidden');
+				currentCoordinates = coords;
+				updateRecordSummary();
+			}
+		}
+
+		/**
+		 * อัปเดตสรุปข้อมูลที่จะบันทึก
+		 */
+		function updateRecordSummary() {
+			if (!currentUser) {
+				recordSummary.classList.add('hidden');
+				return;
+			}
+
+			const selectedActivity = activitySelect.value;
+			const selectedImage = imageUpload.files[0];
+			
+			document.getElementById('summary-user').textContent = `${currentUser.fullName} (${currentUser.pscode})`;
+			document.getElementById('summary-activity').textContent = selectedActivity || 'ยังไม่เลือก';
+			document.getElementById('summary-date').textContent = activityDate.textContent || '-';
+			document.getElementById('summary-round').textContent = activityRoundDisplay.textContent || '-';
+			document.getElementById('summary-year').textContent = activityYear.textContent || '-';
+			
+			// ปรับปรุงการแสดงผลภาพ
+			const imageElement = document.getElementById('summary-image');
+			if (selectedImage) {
+				imageElement.textContent = `✅ ${selectedImage.name}`;
+				imageElement.className = 'text-green-600';
+			} else {
+				imageElement.textContent = '📷 ไม่มีการแนบภาพ';
+				imageElement.className = 'text-gray-500';
+			}
+			
+			document.getElementById('summary-coords').textContent = currentCoordinates || 'กำลังขอพิกัด...';
+
+			// เปลี่ยนเงื่อนไข: ไม่ต้องมีภาพก็บันทึกได้
+			if (selectedActivity && currentCoordinates) {
+				recordSummary.classList.remove('hidden');
+			}
+		}
+
+		/**
+		 * Switches between the record and dashboard views.
+		 * @param {('record'|'dashboard'|'activities')} viewName - The view to show.
+		 */
+		function switchView(viewName) {
+			// ซ่อนทุก view
+			viewRecord.classList.add('hidden');
+			viewDashboard.classList.add('hidden');
+			viewActivities.classList.add('hidden');
+			
+			// รีเซ็ต tab styles
+			[tabRecord, tabDashboard, tabActivities].forEach(tab => {
+				tab.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+				tab.classList.remove('text-indigo-600', 'border-indigo-500');
+			});
+			
+			// แสดง view ที่เลือกและเปลี่ยน tab style
+			if (viewName === 'record') {
+				viewRecord.classList.remove('hidden');
+				tabRecord.classList.add('text-indigo-600', 'border-indigo-500');
+				tabRecord.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+			} else if (viewName === 'dashboard') {
+				viewDashboard.classList.remove('hidden');
+				tabDashboard.classList.add('text-indigo-600', 'border-indigo-500');
+				tabDashboard.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+			} else if (viewName === 'activities') {
+				viewActivities.classList.remove('hidden');
+				tabActivities.classList.add('text-indigo-600', 'border-indigo-500');
+				tabActivities.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+				// โหลดข้อมูลกิจกรรมเมื่อเปิดหน้านี้
+				loadActivitiesList();
+			}
+		}
+		
+		/**
+		 * Converts a file to a Base64 string.
+		 * @param {File} file - The file to convert.
+		 * @returns {Promise<string>} A promise that resolves with the Base64 string.
+		 */
+		function fileToBase64(file) {
+			return new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.readAsDataURL(file);
+				reader.onload = () => resolve(reader.result.split(',')[1]); // Remove the data URI prefix
+				reader.onerror = error => reject(error);
+			});
+		}
+		
+		/**
+		 * Fetches data from the Google Apps Script backend.
+		 * @param {string} action - The action to perform.
+		 * @param {object} [payload={}] - The data to send.
+		 * @returns {Promise<any>} A promise that resolves with the response data.
+		 */
+		async function fetchFromScript(action, payload = {}) {
+			try {
+				// ตรวจสอบ URL ก่อนใช้งาน
+				const currentURL = validateScriptURL();
+				
+				console.log('🚀 Attempting to fetch:', action, payload);
+				console.log('📍 Script URL:', currentURL);
+				
+				// ใช้ GET request เพื่อหลีกเลี่ยง CORS preflight
+				const params = new URLSearchParams({ 
+					action, 
+					data: JSON.stringify(payload) 
+				});
+				
+				const fullUrl = `${currentURL}?${params}`;
+				console.log('🔗 Full URL:', fullUrl);
+				
+				// ลองเชื่อมต่อด้วย timeout
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 วินาที timeout
+				
+				const response = await fetch(fullUrl, {
+					method: 'GET',
+					mode: 'cors',
+					headers: {
+						'Accept': 'application/json',
+					},
+					signal: controller.signal
+				});
+				
+				clearTimeout(timeoutId);
+				
+				console.log('📨 Response status:', response.status);
+				console.log('📨 Response ok:', response.ok);
+				
+				if (!response.ok) {
+					const errorText = await response.text();
+					console.error('❌ Response error text:', errorText);
+					throw new Error(`เกิดข้อผิดพลาดจาก Server: ${response.status} - ${response.statusText}`);
+				}
+				
+				const result = await response.json();
+				console.log('✅ Response result:', result);
+				return result;
+				
+			} catch (error) {
+				console.error('❌ Fetch error details:', {
+					message: error.message,
+					stack: error.stack,
+					name: error.name
+				});
+				
+				// เพิ่มข้อความแสดงข้อผิดพลาดที่เป็นมิตรกับผู้ใช้
+				if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+					throw new Error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\n\nสาเหตุที่เป็นไปได้:\n1. ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต\n2. Google Apps Script อาจไม่ได้ Deploy หรือ URL ไม่ถูกต้อง\n3. ลองรีเฟรชหน้าเว็บแล้วลองใหม่\n4. ตรวจสอบ Console สำหรับข้อมูลเพิ่มเติม');
+				}
+				
+				if (error.name === 'AbortError') {
+					throw new Error('การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง');
+				}
+				
+				throw error;
+			}
+		}
+
+		// ฟังก์ชันทดสอบการเชื่อมต่อ
+		async function testConnection() {
+			try {
+				console.log('🧪 Testing connection to Google Apps Script...');
+				showMessage('กำลังทดสอบการเชื่อมต่อ...', 'info');
+				
+				// ทดสอบ URL ก่อน
+				validateScriptURL();
+				
+				const result = await fetchFromScript('getInitialData');
+				if (result.status === 'success') {
+					showMessage('✅ การเชื่อมต่อสำเร็จ!', 'success');
+					console.log('✅ Connection test successful');
+					return true;
+				} else {
+					showMessage('❌ การเชื่อมต่อล้มเหลว: ' + result.message, 'error');
+					console.error('❌ Connection test failed:', result);
+					return false;
+				}
+			} catch (error) {
+				const errorMsg = error.message || 'ไม่ทราบสาเหตุ';
+				showMessage('❌ ไม่สามารถเชื่อมต่อได้: ' + errorMsg, 'error');
+				console.error('❌ Connection test error:', error);
+				
+				// แสดงคำแนะนำการแก้ไข
+				showTroubleshootingSteps();
+				return false;
+			}
+		}
+
+		// แสดงขั้นตอนการแก้ไขปัญหา
+		function showTroubleshootingSteps() {
+			const troubleshootDiv = document.createElement('div');
+			troubleshootDiv.className = 'mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md';
+			troubleshootDiv.innerHTML = `
+				<h3 class="text-lg font-semibold text-yellow-800 mb-2">🔧 วิธีแก้ไขปัญหา:</h3>
+				<ol class="list-decimal list-inside text-sm text-yellow-700 space-y-1">
+					<li>เปิด Google Apps Script: <a href="https://script.google.com" target="_blank" class="text-blue-600 underline">script.google.com</a></li>
+					<li>เปิดโปรเจค "Pharm_event" ของคุณ</li>
+					<li>คลิก Deploy → New deployment</li>
+					<li>เลือก Type: Web app</li>
+					<li>ตั้งค่า Execute as: Me, Who has access: Anyone</li>
+					<li>คลิก Deploy และคัดลอก URL ใหม่</li>
+					<li>นำ URL มาใส่ในตัวแปร SCRIPT_URL ในไฟล์ HTML</li>
+					<li>รีเฟรชหน้าเว็บและลองใหม่</li>
+				</ol>
+				<button onclick="this.parentElement.remove()" class="mt-2 px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700">
+					ปิด
+				</button>
+			`;
+			
+			const container = document.querySelector('.container');
+			container.insertBefore(troubleshootDiv, container.firstChild);
+		}
+
+		// ฟังก์ชันสำรองในกรณีที่ fetch หลักล้มเหลว
+		async function fetchFromScriptFallback(action, payload = {}) {
+			try {
+				console.log('🔄 Using fallback fetch method...');
+				
+				// สร้าง form สำหรับส่งข้อมูล
+				const form = document.createElement('form');
+				form.method = 'POST';
+				form.action = SCRIPT_URL;
+				form.target = '_blank';
+				
+				// เพิ่ม input fields
+				const actionInput = document.createElement('input');
+				actionInput.type = 'hidden';
+				actionInput.name = 'action';
+				actionInput.value = action;
+				form.appendChild(actionInput);
+				
+				const dataInput = document.createElement('input');
+				dataInput.type = 'hidden';
+				dataInput.name = 'data';
+				dataInput.value = JSON.stringify(payload);
+				form.appendChild(dataInput);
+				
+				document.body.appendChild(form);
+				form.submit();
+				document.body.removeChild(form);
+				
+				return { status: 'success', message: 'ข้อมูลถูกส่งแล้ว กรุณาตรวจสอบในแท็บใหม่' };
+				
+			} catch (error) {
+				console.error('❌ Fallback method error:', error);
+				throw error;
+			}
+		}
+
+		// ฟังก์ชันแสดง Dialog สำหรับอัพเดท URL
+		function showUpdateURLDialog() {
+			const overlay = document.createElement('div');
+			overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+			overlay.innerHTML = `
+				<div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+					<h3 class="text-lg font-semibold mb-4">🔧 อัพเดท Google Apps Script URL</h3>
+					<p class="text-sm text-gray-600 mb-4">
+						หากมีปัญหาการเชื่อมต่อ กรุณาทำการ Deploy Google Apps Script ใหม่และใส่ URL ใหม่ที่นี่
+					</p>
+					<input type="text" id="newScriptURL" value="${SCRIPT_URL}" 
+						   class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-4"
+						   placeholder="https://script.google.com/macros/s/.../exec">
+					<div class="flex justify-end space-x-3">
+						<button onclick="closeURLDialog()" 
+								class="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">
+							ยกเลิก
+						</button>
+						<button onclick="updateScriptURL()" 
+								class="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700">
+							อัพเดท URL
+						</button>
+					</div>
+					<div class="mt-4 text-xs text-gray-500">
+						<strong>วิธีหา URL ใหม่:</strong><br>
+						1. เปิด <a href="https://script.google.com" target="_blank" class="text-blue-600">script.google.com</a><br>
+						2. Deploy → New deployment → Web app<br>
+						3. Execute as: Me, Who has access: Anyone<br>
+						4. คัดลอก URL ที่ได้
+					</div>
+				</div>
+			`;
+			
+			window.closeURLDialog = function() {
+				document.body.removeChild(overlay);
+			};
+			
+			window.updateScriptURL = function() {
+				const newURL = document.getElementById('newScriptURL').value.trim();
+				if (newURL && newURL.includes('script.google.com/macros')) {
+					// อัพเดท URL (ในการใช้งานจริงอาจต้องใช้ localStorage)
+					window.SCRIPT_URL = newURL;
+					showMessage('✅ อัพเดท URL สำเร็จ! กรุณาทดสอบการเชื่อมต่อ', 'success');
+					closeURLDialog();
+				} else {
+					showMessage('❌ URL ไม่ถูกต้อง กรุณาใส่ URL จาก Google Apps Script', 'error');
+				}
+			};
+			
+			document.body.appendChild(overlay);
+		}
+
+		/**
+		 * Fetches and populates the activity dropdown.
+		 */
+		async function loadActivities() {
+			try {
+				const response = await fetchFromScript('getInitialData');
+				if (response.status === 'success') {
+					currentActivities = response.activities;
+					
+					// Populate Activities
+					activitySelect.innerHTML = '<option value="">-- กรุณาเลือกกิจกรรม --</option>';
+					response.activities.forEach(activity => {
+						const option = document.createElement('option');
+						option.value = activity.name;
+						option.textContent = `${activity.name} (${activity.date}) รอบ ${activity.round} ปี ${activity.buddhistYear}`;
+						activitySelect.appendChild(option);
+					});
+
+					// Populate Year Filter (ใช้ปี พ.ศ.)
+					yearFilter.innerHTML = '<option value="">-- ทุกปี --</option>';
+					if (response.filters.buddhistYears) {
+						response.filters.buddhistYears.forEach(year => {
+							const option = document.createElement('option');
+							option.value = year;
+							option.textContent = `ปี ${year}`;
+							yearFilter.appendChild(option);
+						});
+					}
+					
+					// Populate Round Filter
+					roundFilter.innerHTML = '<option value="">-- ทุกรอบ --</option>';
+					response.filters.rounds.forEach(round => {
+						const option = document.createElement('option');
+						option.value = round;
+						option.textContent = `รอบที่ ${round}`;
+						roundFilter.appendChild(option);
+					});
+
+					showMessage('โหลดข้อมูลสำเร็จ', 'success');
+				} else {
+					throw new Error(response.message || 'ไม่สามารถโหลดข้อมูลกิจกรรมได้');
+				}
+			} catch (error) {
+				activitySelect.innerHTML = '<option>โหลดข้อมูลล้มเหลว</option>';
+				showMessage('เกิดข้อผิดพลาด: ' + error.message, 'error');
+				console.error('Error loading initial data:', error);
+			}
+		}
+		
+		/**
+		 * Gets the user's GPS coordinates.
+		 */
+		function getCoordinates() {
+			if (navigator.geolocation) {
+				locationStatus.innerHTML = '<div class="flex items-center"><div class="loader w-4 h-4 mr-2"></div>กำลังขอพิกัด...</div>';
+				navigator.geolocation.getCurrentPosition(
+					(position) => {
+						userCoordinates = {
+							latitude: position.coords.latitude,
+							longitude: position.coords.longitude,
+						};
+						const coordsStr = `${userCoordinates.latitude.toFixed(6)}, ${userCoordinates.longitude.toFixed(6)}`;
+						locationStatus.innerHTML = `<div class="text-green-600 flex items-center">
+							<svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+							</svg>
+							ได้รับพิกัดเรียบร้อย
+						</div>`;
+						updateCoordinatesDisplay(userCoordinates.latitude, userCoordinates.longitude);
+					},
+					(error) => {
+						locationStatus.innerHTML = `<div class="text-red-600">ไม่สามารถเข้าถึงพิกัดได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง</div>`;
+						console.error('Geolocation error:', error);
+					},
+					{
+						enableHighAccuracy: true,
+						timeout: 10000,
+						maximumAge: 300000
+					}
+				);
+			} else {
+				locationStatus.innerHTML = `<div class="text-red-600">เบราว์เซอร์ของคุณไม่รองรับ Geolocation</div>`;
+			}
+		}
+
+		/**
+		 * Handles the activity form submission.
+		 */
+		async function handleFormSubmit(event) {
+			console.log('📝 Form submission started');
+			event.preventDefault();
+			
+			if (isSubmitting) {
+				console.log('⏸️ Form submission already in progress, ignoring');
+				return;
+			}
+
+			try {
+				// เก็บข้อมูลจากฟอร์ม
+				const pscode = document.getElementById('user-pscode').value.trim();
+				const activity = activitySelect.value;
+				const round = document.getElementById('activity-round').value;
+				const imageFile = imageUpload.files[0]; // อาจเป็น undefined ถ้าไม่มีการเลือกไฟล์
+
+				console.log('📋 Form data:', { 
+					pscode, 
+					activity, 
+					round, 
+					hasImage: !!imageFile,
+					userCoordinates,
+					currentCoordinates 
+				});
+
+				// ปรับเงื่อนไข: ไม่ต้องมีภาพก็บันทึกได้
+				if (!pscode || !activity || !round) {
+					console.log('❌ Required fields missing:', {
+						pscode: pscode || 'ว่าง',
+						activity: activity || 'ว่าง', 
+						round: round || 'ว่าง'
+					});
+					
+					let missingFields = [];
+					if (!pscode) missingFields.push('PScode ผู้บันทึก');
+					if (!activity) missingFields.push('กิจกรรม');
+					if (!round) missingFields.push('รอบ');
+					
+					showMessage(`กรุณากรอกข้อมูลให้ครบ: ${missingFields.join(', ')}`, 'error');
+					return;
+				}
+				
+				if (!userCoordinates) {
+					console.log('❌ User coordinates missing');
+					showMessage('กรุณารอสักครู่หรืออนุญาตให้เข้าถึงพิกัด', 'error');
+					return;
+				}
+
+				// ตั้งสถานะกำลังส่งข้อมูล
+				isSubmitting = true;
+				submitBtnText.textContent = 'กำลังบันทึก...';
+				submitBtnLoader.classList.remove('hidden');
+				console.log('⏳ Submission in progress...');
+
+				// ตรวจสอบว่ามีการเลือกไฟล์หรือไม่
+				let imageData = null;
+				if (imageFile) {
+					console.log('🖼️ Processing image file...');
+					const imageBase64 = await fileToBase64(imageFile);
+					imageData = {
+						filename: imageFile.name,
+						data: imageBase64
+					};
+					console.log('✅ Image processed successfully');
+				} else {
+					console.log('ℹ️ No image file selected');
+				}
+				
+				const payload = {
+					pscode,
+					activity,
+					round, // เพิ่ม round ในการส่งข้อมูล
+					image: imageData, // อาจเป็น null ถ้าไม่มีภาพ
+					coordinates: currentCoordinates,
+					latitude: userCoordinates.latitude,
+					longitude: userCoordinates.longitude
+				};
+
+				console.log('📤 Sending payload:', payload);
+				const response = await fetchFromScript('addRecord', payload);
+				console.log('📥 Received response:', response);
+				
+				if (response.status === 'success') {
+					// แสดงข้อความแตกต่างกันตามว่ามีภาพหรือไม่
+					const imageStatus = imageFile ? 'พร้อมภาพประกอบ' : 'ไม่มีภาพประกอบ';
+					showMessage(`✅ บันทึกข้อมูลสำเร็จ! (${imageStatus})`, 'success');
+					
+					// แสดงข้อมูลที่บันทึกสำเร็จ
+					if (response.record) {
+						showMessage(`📋 บันทึกสำเร็จ: ${response.record.activity} (ID: ${response.record.idrecord})`, 'success');
+					}
+					
+					console.log('✅ Form submitted successfully, resetting form...');
+					
+					// Reset form
+					activityForm.reset();
+					userInfo.classList.add('hidden');
+					activityDetails.classList.add('hidden');
+					imagePreview.classList.add('hidden');
+					coordinatesDisplay.classList.add('hidden');
+					recordSummary.classList.add('hidden');
+					currentUser = null;
+					
+					// Get coordinates again
+					getCoordinates();
+					
+					console.log('🔄 Form reset completed');
+				} else {
+					console.error('❌ Server returned error status:', response);
+					throw new Error(response.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+				}
+
+			} catch (error) {
+				console.error('❌ Form submission error:', error);
+				console.error('❌ Error stack:', error.stack);
+				showMessage(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+				
+				// เพิ่มข้อมูล debug เพิ่มเติม
+				if (window.location.search.includes('debug=true')) {
+					console.log('🔍 Debug mode: showing detailed error info');
+					showMessage(`🔍 Debug Info: ${error.name} - ${error.message}`, 'error');
+				}
+			} finally {
+				isSubmitting = false;
+				submitBtnText.textContent = 'บันทึกข้อมูล';
+				submitBtnLoader.classList.add('hidden');
+				console.log('🏁 Form submission process completed');
+			}
+		}
+
+		/**
+		 * Loads and displays dashboard data.
+		 */
+		async function loadDashboardData() {
+			dashboardLoader.classList.remove('hidden');
+			dashboardResults.innerHTML = '';
+
+			try {
+				const year = yearFilter.value;
+				const round = roundFilter.value;
+
+				const response = await fetchFromScript('getDashboardData', { year, round });
+				if (response.status === 'success') {
+					renderDashboard(response.data);
+				} else {
+					throw new Error(response.message || 'ไม่สามารถโหลดข้อมูล Dashboard ได้');
+				}
+			} catch (error) {
+				 dashboardResults.innerHTML = `<div class="text-center p-8 text-red-500">${error.message}</div>`;
+				 console.error('Dashboard loading error:', error);
+			} finally {
+				 dashboardLoader.classList.add('hidden');
+			}
+		}
+
+		/**
+		 * Renders the dashboard UI from processed data.
+		 * @param {object} data - The data from the backend.
+		 */
+		function renderDashboard(data) {
+			 if (Object.keys(data.summary).length === 0) {
+				dashboardResults.innerHTML = `<div class="text-center p-8 text-gray-500">ไม่พบข้อมูลการเข้าร่วมสำหรับเงื่อนไขที่เลือก</div>`;
+				return;
+			}
+
+			let html = `<h3 class="text-xl font-semibold text-gray-800 mb-4">สรุปการเข้าร่วมกิจกรรม (รวม ${data.totalRecords} รายการ)</h3>`;
+			
+			// ตารางสรุปตามกิจกรรม
+			html += `<div class="overflow-x-auto mb-6"><table class="min-w-full bg-white border border-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">กิจกรรม</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">จำนวนผู้เข้าร่วม</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200">`;
+			
+			for (const activity in data.summary) {
+				html += `<tr>
+							<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${activity}</td>
+							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${data.summary[activity]} คน</td>
+						 </tr>`;
+			}
+
+			html += `</tbody></table></div>`;
+			
+			// ตารางสรุปตามผู้ใช้ (ถ้ามีข้อมูล)
+			if (data.userSummary && Object.keys(data.userSummary).length > 0) {
+				html += `<h4 class="text-lg font-semibold text-gray-800 mb-3">รายละเอียดผู้เข้าร่วม</h4>`;
+				html += `<div class="overflow-x-auto"><table class="min-w-full bg-white border border-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PScode</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">จำนวนครั้ง</th>
+								<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">กิจกรรมที่เข้าร่วม (ไม่ซ้ำ)</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200">`;
+				
+				for (const pscode in data.userSummary) {
+					const rawList = data.userSummary[pscode];
+					const countAll = rawList.length; // จำนวนครั้งทั้งหมด
+					const distinctActivities = [...new Set(rawList)];
+					html += `<tr>
+							<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${pscode}</td>
+							<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${countAll}</td>
+							<td class="px-6 py-4 text-sm text-gray-500">${distinctActivities.join(', ')}</td>
+						 </tr>`;
+				}
+				
+				html += `</tbody></table></div>`;
+			}
+			
+			dashboardResults.innerHTML = html;
+		}
+
+		// --- ACTIVITY MANAGEMENT FUNCTIONS ---
+
+		/**
+		 * โหลดรายการกิจกรรมทั้งหมด
+		 */
+		async function loadActivitiesList() {
+			try {
+				activitiesLoader.classList.remove('hidden');
+				const response = await fetchFromScript('getInitialData');
+				
+				if (response.status === 'success') {
+					displayActivitiesList(response.activities || []);
+					populateYearFilter(response.activities || []);
+				} else {
+					showMessage('ไม่สามารถโหลดข้อมูลกิจกรรมได้: ' + response.message, 'error');
+				}
+			} catch (error) {
+				console.error('Error loading activities:', error);
+				showMessage('เกิดข้อผิดพลาดในการโหลดข้อมูล: ' + error.message, 'error');
+			} finally {
+				activitiesLoader.classList.add('hidden');
+			}
+		}
+
+		/**
+		 * แสดงรายการกิจกรรมในตาราง
+		 */
+		function displayActivitiesList(activities) {
+			if (!activities || activities.length === 0) {
+				activitiesTableBody.innerHTML = `
+					<tr>
+						<td colspan="5" class="px-6 py-4 text-center text-gray-500">
+							ไม่พบข้อมูลกิจกรรม
+						</td>
+					</tr>
+				`;
+				return;
+			}
+
+			const html = activities.map(activity => {
+				// จัดการวันที่: activity.date อาจเป็นรูปแบบ dd/MM/yyyy หรือ Date object แปลงไม่ได้
+				let displayDate = 'ไม่ระบุ';
+				if (activity.date && activity.date !== 'ไม่ระบุ') {
+					try {
+						// ถ้ามี / ให้ parsing แบบ manual
+						if (typeof activity.date === 'string' && activity.date.includes('/')) {
+							const parts = activity.date.split('/'); // dd/MM/yyyy
+							if (parts.length === 3) {
+								const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+								displayDate = d.toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
+							}
+						} else {
+							const d2 = new Date(activity.date);
+							if (!isNaN(d2.getTime())) {
+								displayDate = d2.toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
+							}
+						}
+					} catch(e){
+						displayDate = activity.date;
+					}
+				}
+
+				const yearDisplay = activity.buddhistYear || activity.year || 'ไม่ระบุ';
+				return `
+				<tr class="hover:bg-gray-50">
+					<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+						${activity.name || 'ไม่ระบุ'}
+					</td>
+					<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+						${displayDate}
+					</td>
+					<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+						${activity.round || 'ไม่ระบุ'}
+					</td>
+					<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+						${yearDisplay}
+					</td>
+					<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+						<button onclick="editActivity('${activity.name}')" 
+								class="text-indigo-600 hover:text-indigo-900 mr-3">
+							แก้ไข
+						</button>
+						<button onclick="deleteActivity('${activity.name}')" 
+								class="text-red-600 hover:text-red-900">
+							ลบ
+						</button>
+					</td>
+				</tr>
+			`;}).join('');
+
+			activitiesTableBody.innerHTML = html;
+		}
+
+		/**
+		 * เพิ่ม Filter ปีใน Activity Management
+		 */
+		function populateYearFilter(activities) {
+			const years = [...new Set(activities.map(a => a.year).filter(y => y))].sort((a, b) => b - a);
+			
+			let html = '<option value="">ทุกปี</option>';
+			years.forEach(year => {
+				html += `<option value="${year}">${year}</option>`;
+			});
+			
+			yearFilterActivities.innerHTML = html;
+		}
+
+		/**
+		 * แสดง preview รหัสกิจกรรมที่จะสร้างอัตโนมัติ
+		 */
+		function updateActivityIdPreview() {
+			const round = document.getElementById('activity-round-input').value;
+			const year = document.getElementById('activity-year-input').value;
+			const previewElement = document.getElementById('activity-id-preview');
+			if (round && year) {
+				const yearSuffix = String(year).slice(-2);
+				const roundFormatted = String(round).padStart(2, '0');
+				previewElement.textContent = `📝 รูปแบบรหัสที่จะสร้าง: ACT${yearSuffix}${roundFormatted}xxx (xxx = ลำดับอัตโนมัติ)`;
+			} else {
+				previewElement.textContent = '💡 เลือกรอบและปีเพื่อดูตัวอย่างรหัส';
+			}
+		}
+
+		/**
+		 * จัดการการเพิ่มกิจกรรมใหม่
+		 */
+		async function handleAddActivity(event) {
+			console.log('📝 Adding new activity');
+			event.preventDefault();
+			
+			const formData = new FormData(event.target);
+			const activityData = {
+				activityId: '', // บังคับให้ระบบสร้างอัตโนมัติ
+				activityName: document.getElementById('activity-name').value.trim(),
+				activityDate: document.getElementById('activity-date-input').value,
+				round: parseInt(document.getElementById('activity-round-input').value),
+				buddhistYear: parseInt(document.getElementById('activity-year-input').value)
+			};
+
+			console.log('📋 New activity data:', activityData);
+			console.log('🕒 Raw date input value:', document.getElementById('activity-date-input').value);
+
+			// ล้าง highlight เดิม
+			['activity-name','activity-date-input','activity-round-input','activity-year-input'].forEach(id => {
+				const el = document.getElementById(id);
+				if (el) el.classList.remove('border-red-500','focus:border-red-500','focus:ring-red-500');
+			});
+
+			const missing = [];
+			if (!activityData.activityName) missing.push('ชื่อกิจกรรม');
+			if (!activityData.activityDate) missing.push('วันที่จัด');
+			if (!activityData.round || isNaN(activityData.round)) missing.push('รอบ');
+			if (!activityData.buddhistYear || isNaN(activityData.buddhistYear)) missing.push('ปี พ.ศ.');
+
+			if (missing.length) {
+				showMessage('กรุณากรอกข้อมูลให้ครบ: ' + missing.join(', '), 'error');
+				// ไฮไลท์ช่องที่ว่าง
+				if (!activityData.activityName) document.getElementById('activity-name').classList.add('border-red-500','focus:border-red-500','focus:ring-red-500');
+				if (!activityData.activityDate) document.getElementById('activity-date-input').classList.add('border-red-500','focus:border-red-500','focus:ring-red-500');
+				if (!activityData.round || isNaN(activityData.round)) document.getElementById('activity-round-input').classList.add('border-red-500','focus:border-red-500','focus:ring-red-500');
+				if (!activityData.buddhistYear || isNaN(activityData.buddhistYear)) document.getElementById('activity-year-input').classList.add('border-red-500','focus:border-red-500','focus:ring-red-500');
+				return;
+			}
+
+			try {
+				showMessage('⏳ กำลังเพิ่มกิจกรรม...', 'info');
+				console.log('📤 Sending activity data:', activityData);
+				
+				const response = await fetchFromScript('addActivity', activityData);
+				console.log('📥 Add activity response:', response);
+				
+				if (response.status === 'success') {
+					const generatedId = response.activityId || 'ไม่ทราบรหัส';
+					showMessage(`✅ เพิ่มกิจกรรมสำเร็จ! รหัส: ${generatedId}`, 'success');
+					addActivityForm.reset();
+					updateActivityIdPreview(); // อัปเดต preview หลัง reset
+					await loadActivitiesList(); // รีโหลดรายการ
+					await loadActivities(); // รีโหลด dropdown ในหน้าบันทึก
+					console.log('✅ Activity added and lists refreshed');
+				} else {
+					showMessage('❌ ไม่สามารถเพิ่มกิจกรรมได้: ' + response.message, 'error');
+				}
+			} catch (error) {
+				console.error('❌ Error adding activity:', error);
+				showMessage('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+			}
+		}
+
+		/**
+		 * แก้ไขกิจกรรม
+		 */
+		function editActivity(activityName) {
+			const target = currentActivities?.find(a => a.name === activityName);
+			if (!target) {
+				showMessage('ไม่พบข้อมูลกิจกรรม', 'error');
+				return;
+			}
+			openEditActivityModal(target);
+		}
+
+		// Modal แก้ไขกิจกรรม
+		function openEditActivityModal(activity){
+			let modal = document.getElementById('edit-activity-modal');
+			if (!modal){
+				modal = document.createElement('div');
+				modal.id = 'edit-activity-modal';
+				modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4';
+				modal.innerHTML = `
+					<div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
+						<h3 class="text-lg font-semibold mb-4">แก้ไขกิจกรรม</h3>
+						<div class="space-y-4">
+							<div>
+								<label class="block text-sm text-gray-700">รหัสกิจกรรม</label>
+								<input id="edit-activity-id" disabled class="mt-1 w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-500" />
+							</div>
+							<div>
+								<label class="block text-sm text-gray-700">ชื่อกิจกรรม</label>
+								<input id="edit-activity-name" class="mt-1 w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+							</div>
+							<div class="grid grid-cols-2 gap-4">
+								<div>
+									<label class="block text-sm text-gray-700">วันที่จัด</label>
+									<input type="date" id="edit-activity-date" class="mt-1 w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+								</div>
+								<div>
+									<label class="block text-sm text-gray-700">รอบ</label>
+									<select id="edit-activity-round" class="mt-1 w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+										<option value="1">1</option>
+										<option value="2">2</option>
+									</select>
+								</div>
+							</div>
+							<div>
+								<label class="block text-sm text-gray-700">ปี พ.ศ.</label>
+								<input type="number" id="edit-activity-year" class="mt-1 w-full px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+							</div>
+						</div>
+						<div class="flex justify-end space-x-3 mt-6">
+							<button type="button" id="btn-cancel-edit-activity" class="px-4 py-2 text-sm rounded-md border bg-white hover:bg-gray-50">ยกเลิก</button>
+							<button type="button" id="btn-save-edit-activity" class="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700">บันทึก</button>
+						</div>
+						<button class="absolute top-2 right-2 text-gray-400 hover:text-gray-600" id="btn-close-edit-activity" title="ปิด">✕</button>
+					</div>`;
+				document.body.appendChild(modal);
+			}
+			// เติมค่า
+			modal.querySelector('#edit-activity-id').value = activity.id || '(Auto)';
+			modal.querySelector('#edit-activity-name').value = activity.name || '';
+			// แปลงวันที่ dd/MM/yyyy -> yyyy-MM-dd
+			let isoDate = '';
+			if (activity.date && activity.date.includes('/')) {
+				const p = activity.date.split('/'); // dd/MM/yyyy
+				if (p.length===3) isoDate = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+			}
+			modal.querySelector('#edit-activity-date').value = isoDate;
+			modal.querySelector('#edit-activity-round').value = activity.round || '1';
+			modal.querySelector('#edit-activity-year').value = activity.buddhistYear || '';
+			modal.classList.remove('hidden');
+			
+			const closeFn = ()=>{modal.classList.add('hidden');};
+			modal.querySelector('#btn-close-edit-activity').onclick = closeFn;
+			modal.querySelector('#btn-cancel-edit-activity').onclick = closeFn;
+			modal.onclick = (e)=>{ if(e.target===modal) closeFn(); };
+			modal.querySelector('#btn-save-edit-activity').onclick = async ()=>{
+				const newName = modal.querySelector('#edit-activity-name').value.trim();
+				const newDate = modal.querySelector('#edit-activity-date').value;
+				const newRound = parseInt(modal.querySelector('#edit-activity-round').value);
+				const newYear = parseInt(modal.querySelector('#edit-activity-year').value);
+				const missing=[];
+				if(!newName) missing.push('ชื่อกิจกรรม');
+				if(!newDate) missing.push('วันที่จัด');
+				if(!newRound) missing.push('รอบ');
+				if(!newYear) missing.push('ปี พ.ศ.');
+				if(missing.length){
+					showMessage('กรุณากรอก: '+missing.join(', '),'error');
+					return;
+				}
+				try {
+					showMessage('กำลังบันทึกการแก้ไข...','info');
+					const payload = {
+						originalName: activity.name,
+						activityName: newName,
+						activityDate: newDate,
+						round: newRound,
+						buddhistYear: newYear
+					};
+					const resp = await fetchFromScript('updateActivity', payload);
+					if(resp.status==='success'){
+						showMessage('อัปเดตกิจกรรมสำเร็จ','success');
+						closeFn();
+						await loadActivitiesList();
+						await loadActivities();
+					}else{
+						if(resp.message && resp.message.includes('Unknown action: updateActivity')){
+							showMessage('ยังไม่ได้อัปเดตสคริปต์ (deploy) ฟังก์ชัน updateActivity กรุณา Deploy Google Apps Script ใหม่','error');
+							console.warn('Suggest redeploy: missing updateActivity on server');
+						}else{
+							showMessage('ไม่สำเร็จ: '+resp.message,'error');
+						}
+					}
+				}catch(err){
+					console.error('Update error',err);
+					showMessage('เกิดข้อผิดพลาด: '+err.message,'error');
+				}
+			};
+		}
+
+		/**
+		 * ลบกิจกรรม
+		 */
+		async function deleteActivity(activityName) {
+			console.log('🗑️ Deleting activity:', activityName);
+			
+			if (!confirm(`คุณต้องการลบกิจกรรม "${activityName}" หรือไม่?`)) {
+				console.log('❌ Delete cancelled by user');
+				return;
+			}
+
+			try {
+				showMessage('⏳ กำลังลบกิจกรรม...', 'info');
+				console.log('📤 Sending delete request for:', activityName);
+				
+				const response = await fetchFromScript('deleteActivity', { name: activityName });
+				console.log('📥 Delete response:', response);
+				
+				if (response.status === 'success') {
+					showMessage('✅ ลบกิจกรรมสำเร็จ!', 'success');
+					await loadActivitiesList(); // รีโหลดรายการ
+					await loadActivities(); // รีโหลด dropdown ในหน้าบันทึก
+					console.log('✅ Activity deleted and lists refreshed');
+				} else {
+					showMessage('❌ ไม่สามารถลบกิจกรรมได้: ' + response.message, 'error');
+				}
+			} catch (error) {
+				console.error('❌ Error deleting activity:', error);
+				showMessage('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
+			}
+		}
+
+		/**
+		 * รีเฟรชรายการกิจกรรม
+		 */
+		function refreshActivityList() {
+			loadActivitiesList();
+		}
+
+		/**
+		 * จัดรูปแบบวันที่สำหรับแสดงผล
+		 */
+		function formatDisplayDate(dateString) {
+			try {
+				const date = new Date(dateString);
+				return date.toLocaleDateString('th-TH', {
+					year: 'numeric',
+					month: 'long',
+					day: 'numeric'
+				});
+			} catch (error) {
+				return dateString;
+			}
+		}
+
+		/**
+		 * กรองรายการกิจกรรมตามคำค้นหาและปี
+		 */
+		function filterActivitiesList() {
+			const searchTerm = activitySearch.value.toLowerCase();
+			const selectedYear = yearFilterActivities.value;
+			const rows = activitiesTableBody.querySelectorAll('tr');
+
+			rows.forEach(row => {
+				const activityName = row.cells[0]?.textContent.toLowerCase() || '';
+				const activityYear = row.cells[3]?.textContent || '';
+				
+				const matchesSearch = !searchTerm || activityName.includes(searchTerm);
+				const matchesYear = !selectedYear || activityYear === selectedYear;
+				
+				if (matchesSearch && matchesYear) {
+					row.style.display = '';
+				} else {
+					row.style.display = 'none';
+				}
+			});
+		}
+
+		// --- EVENT LISTENERS ---
+		tabRecord.addEventListener('click', () => switchView('record'));
+		tabDashboard.addEventListener('click', () => switchView('dashboard'));
+		tabActivities.addEventListener('click', () => switchView('activities'));
+		activityForm.addEventListener('submit', handleFormSubmit);
+		addActivityForm.addEventListener('submit', handleAddActivity);
+		loadDashboardBtn.addEventListener('click', loadDashboardData);
+		
+		// เพิ่ม event listener สำหรับตรวจสอบผู้ใช้เมื่อกรอก PScode
+		userPscode.addEventListener('blur', (e) => {
+			checkUser(e.target.value.trim());
+		});
+		
+		userPscode.addEventListener('input', (e) => {
+			if (e.target.value.trim().length >= 3) {
+				checkUser(e.target.value.trim());
+			}
+		});
+
+		// Event listeners สำหรับ Activity Management
+		activitySearch.addEventListener('input', filterActivitiesList);
+		yearFilterActivities.addEventListener('change', filterActivitiesList);
+		
+		// Event listeners สำหรับ Activity ID Preview
+		document.getElementById('activity-id').addEventListener('input', updateActivityIdPreview);
+		document.getElementById('activity-round-input').addEventListener('input', updateActivityIdPreview);
+		document.getElementById('activity-year-input').addEventListener('input', updateActivityIdPreview);
+		
+		// Event listener สำหรับเลือกกิจกรรม
+		activitySelect.addEventListener('change', (e) => {
+			updateActivityDetails(e.target.value);
+		});
+		
+		// Event listener สำหรับอัปโหลดภาพ
+		imageUpload.addEventListener('change', (e) => {
+			const file = e.target.files[0];
+			const clearButton = document.getElementById('clear-image');
+			
+			if (file) {
+				// ตรวจสอบขนาดไฟล์ (5MB = 5 * 1024 * 1024 bytes)
+				if (file.size > 5 * 1024 * 1024) {
+					showMessage('ขนาดไฟล์ใหญ่เกินไป (ไม่เกิน 5MB)', 'error');
+					imageUpload.value = '';
+					imagePreview.classList.add('hidden');
+					clearButton.classList.add('hidden');
+					updateRecordSummary();
+					return;
+				}
+				
+				// ตรวจสอบประเภทไฟล์
+				const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+				if (!allowedTypes.includes(file.type)) {
+					showMessage('ประเภทไฟล์ไม่รองรับ (รองรับเฉพาะ JPG, PNG, WEBP)', 'error');
+					imageUpload.value = '';
+					imagePreview.classList.add('hidden');
+					clearButton.classList.add('hidden');
+					updateRecordSummary();
+					return;
+				}
+				
+				previewImage(file);
+				clearButton.classList.remove('hidden');
+			} else {
+				imagePreview.classList.add('hidden');
+				clearButton.classList.add('hidden');
+				updateRecordSummary();
+			}
+		});
+
+		// --- DEBUGGING FUNCTIONS ---
+		function debugSystem() {
+			console.log('🔍 System Debug Info:');
+			console.log('- Script URL:', SCRIPT_URL);
+			console.log('- Current User:', currentUser);
+			console.log('- User Coordinates:', userCoordinates);
+			console.log('- Activity Form:', activityForm);
+			console.log('- Add Activity Form:', addActivityForm);
+			console.log('- Activity Select:', activitySelect);
+			console.log('- Is Submitting:', isSubmitting);
+		}
+
+		// เพิ่มฟังก์ชันทดสอบการบันทึก
+		function testSave() {
+			console.log('🧪 Testing save functionality...');
+			const testPayload = {
+				pscode: 'TEST001',
+				activity: 'test',
+				image: null,
+				coordinates: 'Test Location',
+				latitude: 13.7563,
+				longitude: 100.5018
+			};
+			
+			fetchFromScript('addRecord', testPayload)
+				.then(response => {
+					console.log('✅ Test save successful:', response);
+					showMessage('✅ การทดสอบบันทึกสำเร็จ!', 'success');
+				})
+				.catch(error => {
+					console.error('❌ Test save failed:', error);
+					showMessage('❌ การทดสอบบันทึกล้มเหลว: ' + error.message, 'error');
+				});
+		}
+
+		// เพิ่มปุ่มทดสอบใน Developer Mode
+		function addDebugButtons() {
+			if (window.location.search.includes('debug=true')) {
+				const debugDiv = document.createElement('div');
+				debugDiv.className = 'fixed top-4 right-4 z-50 space-x-2';
+				debugDiv.innerHTML = `
+					<button onclick="debugSystem()" class="px-3 py-1 bg-blue-500 text-white rounded text-sm">Debug</button>
+					<button onclick="testSave()" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Test Save</button>
+					<button onclick="testConnection()" class="px-3 py-1 bg-yellow-500 text-white rounded text-sm">Test Connection</button>
+				`;
+				document.body.appendChild(debugDiv);
+			}
+		}
+
+		// --- INITIALIZATION ---
+		window.addEventListener('load', () => {
+			console.log('🚀 Application starting...');
+			try {
+				switchView('record');
+				loadActivities();
+				getCoordinates();
+				addDebugButtons();
+				updateActivityIdPreview(); // แสดง preview รหัสกิจกรรม
+				console.log('✅ Application initialized successfully');
+			} catch (error) {
+				console.error('❌ Application initialization failed:', error);
+				showMessage('❌ ไม่สามารถเริ่มระบบได้: ' + error.message, 'error');
+			}
+		});
+	</script>
+</body>
+</html>
