@@ -2,7 +2,7 @@
 const SHEET_RECORD = 'sheetrecord';
 const SHEET_USER = 'sheetuser';  
 const SHEET_ACTIVITY = 'sheetactivity';
-const APP_VERSION = '2025-09-05-01'; // update when backend changes
+const APP_VERSION = '2025-09-15-04'; // update when backend changes
 
 // รับ GET request จาก web app (แก้ไข CORS)
 function doGet(e) {
@@ -12,15 +12,12 @@ function doGet(e) {
     
     let result;
     if (action === 'addRecord') {
-    // รองรับทั้งรูปแบบมี prefix (data:image/jpeg;base64,xxx) และไม่มี prefix (xxx)
-    let pureBase64 = imageData;
-    if (imageData.includes(',')) {
-      const parts = imageData.split(',');
-      pureBase64 = parts[parts.length - 1];
-    }
-    const decodedBytes = Utilities.base64Decode(pureBase64);
-    const safeFilename = filename || `activity_${recordId}.jpg`;
-    const blob = Utilities.newBlob(decodedBytes, 'image/jpeg', safeFilename);
+      result = addRecord(data);
+    } else if (action === 'addUser') {
+      result = addUser(data);
+    } else if (action === 'addActivity') {
+      result = addActivity(data);
+    } else if (action === 'deleteActivity') {
       result = deleteActivity(data);
     } else if (action === 'updateActivity') {
       result = updateActivity(data);
@@ -38,8 +35,15 @@ function doGet(e) {
       result = getAllUsers(data);
     } else if (action === 'getActivityReport') {
       result = getActivityReport(data);
+    } else if (action === 'exportDashboardToExcel') {
+      result = exportDashboardToExcel(data);
     } else if (action === 'uploadImage') {
-      result = uploadImageToDrive(data.imageData, data.filename, data.recordId);
+      // รองรับพารามิเตอร์หลายชื่อ (imageData | data | image)
+      result = uploadImageToDrive(
+        (typeof data.imageData !== 'undefined' ? data.imageData : (typeof data.data !== 'undefined' ? data.data : data.image)),
+        data.filename,
+        data.recordId
+      );
     } else if (action === 'getVersion') {
       result = {status:'success', version: APP_VERSION, timestamp: new Date().toISOString()};
     } else {
@@ -90,6 +94,8 @@ function doPost(e) {
       result = getAllUsers(params);
     } else if (action === 'getActivityReport') {
       result = getActivityReport(params);
+    } else if (action === 'exportDashboardToExcel') {
+      result = exportDashboardToExcel(params);
     } else if (action === 'uploadImage') {
       result = uploadImageToDrive(params.imageData, params.filename, params.recordId);
     } else if (action === 'getVersion') {
@@ -107,6 +113,107 @@ function doPost(e) {
       status: 'error', 
       message: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ส่งออก Dashboard เป็นไฟล์ Excel (.xlsx) ใน Google Drive และคืนลิงก์ดาวน์โหลด
+function exportDashboardToExcel(params) {
+  try {
+    // ใช้ฟังก์ชันเดิมเพื่อคำนวณข้อมูล
+    const dash = getDashboardData({ year: params.year || '', round: params.round || '' });
+    if (dash.status !== 'success') {
+      return { status: 'error', message: 'ไม่สามารถประมวลผลข้อมูล Dashboard ได้' };
+    }
+
+    const data = dash.data || { summary: {}, userSummary: {}, activityDetails: [], totalRecords: 0 };
+    
+    // สร้างสเปรดชีตชั่วคราว
+    const timestamp = new Date();
+    const fileNameBase = `Dashboard_${params.year || 'ทุกปี'}_R${params.round || 'ทุก'}_${Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss')}`;
+    const tempSs = SpreadsheetApp.create(`${fileNameBase}_TEMP`);
+
+    // Sheet: Summary by activity
+    const summarySheet = tempSs.getActiveSheet();
+    summarySheet.setName('Summary');
+    const summaryRows = [['กิจกรรม', 'จำนวนผู้เข้าร่วม']];
+    Object.keys(data.summary).forEach(act => {
+      summaryRows.push([act, data.summary[act]]);
+    });
+    if (summaryRows.length === 1) {
+      summaryRows.push(['-', 0]);
+    }
+    summarySheet.getRange(1, 1, summaryRows.length, 2).setValues(summaryRows);
+    summarySheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#e5e7eb');
+    summarySheet.autoResizeColumns(1, 2);
+
+    // Sheet: Users summary
+    const usersSheet = tempSs.insertSheet('Users');
+    const usersRows = [['USER', 'PScode', 'จำนวนครั้งทั้งหมด', 'กิจกรรมที่เข้าร่วม (ไม่ซ้ำ)']];
+    Object.keys(data.userSummary || {}).forEach(userDisplay => {
+      const list = data.userSummary[userDisplay] || [];
+      const distinct = Array.from(new Set(list));
+      const pscode = extractPscode(userDisplay);
+      usersRows.push([userDisplay, pscode, list.length, distinct.join(', ')]);
+    });
+    if (usersRows.length === 1) {
+      usersRows.push(['-', '-', 0, '-']);
+    }
+    usersSheet.getRange(1, 1, usersRows.length, 4).setValues(usersRows);
+    usersSheet.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#e5e7eb');
+    usersSheet.autoResizeColumns(1, 4);
+
+    // Sheet: Details
+    const detailsSheet = tempSs.insertSheet('Details');
+    const detailsHeader = ['idrecord', 'timestamp', 'กิจกรรม', 'วันที่จัด', 'รอบ', 'ปี', 'ภาพ', 'พิกัด', 'user', 'PScode'];
+    const detailsRows = [detailsHeader];
+    (data.activityDetails || []).forEach(r => {
+      detailsRows.push([
+        r.idrecord, r.timestamp, r.activity, r.activityDate, r.round, r.year,
+        r.image, r.coordinates, r.user, r.pscode
+      ]);
+    });
+    if (detailsRows.length === 1) {
+      detailsRows.push(['-', '-', '-', '-', '-', '-', '-', '-', '-', '-']);
+    }
+    detailsSheet.getRange(1, 1, detailsRows.length, detailsHeader.length).setValues(detailsRows);
+    detailsSheet.getRange(1, 1, 1, detailsHeader.length).setFontWeight('bold').setBackground('#e5e7eb');
+    detailsSheet.autoResizeColumns(1, detailsHeader.length);
+
+    // แปลงเป็นไฟล์ Excel (.xlsx)
+    const folderName = 'ActivityExports';
+    let folder;
+    const folders = DriveApp.getFoldersByName(folderName);
+    folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+
+    // ใช้ UrlFetchApp export Spreadsheet -> XLSX (หลีกเลี่ยงปัญหา getAs ไม่รองรับ)
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${tempSs.getId()}/export?format=xlsx`;
+    const token = ScriptApp.getOAuthToken();
+    const fetchResp = UrlFetchApp.fetch(exportUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+      muteHttpExceptions: true
+    });
+    if (fetchResp.getResponseCode() !== 200) {
+      throw new Error('Export failed: HTTP ' + fetchResp.getResponseCode() + ' - ' + fetchResp.getContentText());
+    }
+    const excelBlob = fetchResp.getBlob().setName(`${fileNameBase}.xlsx`);
+    const xlsxFile = folder.createFile(excelBlob);
+    xlsxFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    // ย้ายสเปรดชีตชั่วคราวไปถังขยะ เพื่อไม่ให้รก
+    DriveApp.getFileById(tempSs.getId()).setTrashed(true);
+
+    return {
+      status: 'success',
+      file: {
+        name: xlsxFile.getName(),
+        id: xlsxFile.getId(),
+        url: xlsxFile.getUrl(),
+        downloadUrl: `https://drive.google.com/uc?export=download&id=${xlsxFile.getId()}`
+      }
+    };
+  } catch (error) {
+    Logger.log('exportDashboardToExcel Error: ' + error.toString());
+    return { status: 'error', message: error.toString() };
   }
 }
 
@@ -327,8 +434,8 @@ function addRecord(params) {
       throw new Error(`ไม่พบชีท ${SHEET_RECORD}`);
     }
     
-    // ตรวจสอบว่าผู้ใช้มีอยู่ในระบบหรือไม่
-    const userInfo = getUserInfo({pscode: params.pscode});
+  // ตรวจสอบว่าผู้ใช้มีอยู่ในระบบหรือไม่
+  const userInfo = getUserInfo({pscode: params.pscode});
     if (userInfo.status === 'error') {
       return {status: 'error', message: 'ไม่พบข้อมูลผู้ใช้ กรุณาลงทะเบียนก่อน'};
     }
@@ -353,8 +460,38 @@ function addRecord(params) {
       }
     }
     
-    const idrecord = new Date().getTime();
+    // ตรวจสอบไม่ให้บันทึกกิจกรรมซ้ำ (กิจกรรม + รอบ + ปี + ผู้ใช้)
+    // ใช้ PScode ในการตรวจสอบเพื่อความแม่นยำ
+    const allRecords = sheet.getDataRange().getValues();
+    const targetActivity = params.activity || '';
+    const targetRound = String(activityRound || '');
+    const targetYear = String(activityYear || '');
+    const targetPscode = userInfo.user.pscode;
+    const isDuplicate = allRecords.slice(1).some(row => {
+      const rowActivity = row[2] || '';
+      const rowRound = String(row[4] || '');
+      const rowYear = String(row[5] || '');
+      const rowUserDisplay = row[8] || '';
+      const rowPscode = extractPscode(rowUserDisplay);
+      return rowActivity === targetActivity 
+        && rowRound === targetRound 
+        && rowYear === targetYear 
+        && rowPscode === targetPscode;
+    });
+    
+    if (isDuplicate) {
+      return { 
+        status: 'error', 
+        code: 'DUPLICATE', 
+        message: 'ไม่สามารถบันทึกได้: ผู้ใช้นี้บันทึกกิจกรรมนี้แล้ว (กิจกรรม-รอบ-ปี ซ้ำ)'
+      };
+    }
+    
+  const idrecord = new Date().getTime();
     const timestamp = new Date();
+
+  // เตรียมชื่อผู้ใช้ในรูปแบบ "ชื่อเต็ม(PScode)"
+  const userDisplay = `${userInfo.user.fullName || params.pscode}(${userInfo.user.pscode || params.pscode})`;
     
     // จัดการภาพ: ถ้ามี base64 ส่งมา -> อัพโหลดจริงไป Drive แล้วเก็บ URL, ถ้าไม่มี -> "ไม่มีภาพ"
     let imageInfo = 'ไม่มีภาพ';
@@ -389,7 +526,7 @@ function addRecord(params) {
       activityYear,
       imageInfo,
       coordinates,
-      params.pscode || ''
+      userDisplay
     ]);
     
     return {
@@ -403,7 +540,8 @@ function addRecord(params) {
         year: activityYear,
         image: imageInfo,
         coordinates: coordinates,
-        user: params.pscode
+        user: userDisplay,
+        pscode: userInfo.user.pscode
       }
     };
   } catch (error) {
@@ -538,7 +676,9 @@ function getDashboardData(params) {
       const activityDate = row[3] || 'ไม่ระบุ';
       const round = row[4] || 'ไม่ระบุ';
       const year = row[5] || 'ไม่ระบุ';
-      const user = row[8] || 'ไม่ระบุ'; // เปลี่ยนจากตำแหน่งที่ 6 เป็น 8
+      const userDisplay = row[8] || 'ไม่ระบุ';
+      const user = userDisplay; // สำหรับ key แสดงผล
+      const pscode = extractPscode(userDisplay);
       
       // นับตามกิจกรรม
       summary[activity] = (summary[activity] || 0) + 1;
@@ -559,7 +699,8 @@ function getDashboardData(params) {
         year: year,
         image: row[6] || '',
         coordinates: row[7] || '',
-        user: user
+        user: userDisplay,
+        pscode: pscode
       });
     });
     
@@ -600,6 +741,13 @@ function toChristianYear(buddhistYear) {
   return parseInt(buddhistYear) - 543;
 }
 
+// แยก PScode จากรูปแบบ "ชื่อเต็ม(PScode)" หรือคืนค่าเดิมถ้าไม่มีวงเล็บ
+function extractPscode(userCell) {
+  const s = String(userCell || '').trim();
+  const m = s.match(/\(([^)]+)\)\s*$/);
+  return m ? m[1].trim() : s;
+}
+
 // ฟังก์ชันอัปโหลดภาพไปยัง Google Drive
 function uploadImageToDrive(imageData, filename, recordId) {
   try {
@@ -612,12 +760,28 @@ function uploadImageToDrive(imageData, filename, recordId) {
       folder = DriveApp.createFolder('ActivityImages');
     }
     
-    // แปลง base64 เป็น blob
-    const blob = Utilities.newBlob(
-      Utilities.base64Decode(imageData.split(',')[1]), 
-      'image/jpeg', 
-      filename || `activity_${recordId}.jpg`
-    );
+    // แปลง base64 เป็น blob (รองรับทั้งแบบมี/ไม่มี prefix)
+    if (!imageData) {
+      return { status: 'error', message: 'No image data provided' };
+    }
+
+    let pureBase64 = String(imageData);
+    // หากมี prefix เช่น data:image/jpeg;base64,xxx ให้ตัดส่วนหน้าออก
+    if (pureBase64.indexOf(',') !== -1) {
+      pureBase64 = pureBase64.split(',').pop();
+    }
+    // ลบช่องว่าง/ขึ้นบรรทัดใหม่ที่อาจปะปนมา
+    pureBase64 = pureBase64.replace(/\s/g, '');
+
+    let decodedBytes;
+    try {
+      decodedBytes = Utilities.base64Decode(pureBase64);
+    } catch (decodeErr) {
+      return { status: 'error', message: 'Invalid base64 image data' };
+    }
+
+    const safeFilename = filename || `activity_${recordId}.jpg`;
+    const blob = Utilities.newBlob(decodedBytes, 'image/jpeg', safeFilename);
     
     // อัปโหลดไฟล์
     const file = folder.createFile(blob);
@@ -753,6 +917,14 @@ function getActivitiesByRoundAndYear(params) {
       buddhistYear: row[4] || (new Date().getFullYear() + 543),
       status: (row[5] !== undefined ? row[5] : 'TRUE')
     }));
+  
+    // กรองเฉพาะ active เป็นค่าเริ่มต้น (TRUE/true/1)
+    if (!params || !params.includeInactive) {
+      activities = activities.filter(act => {
+        const v = (act.status !== undefined) ? act.status : 'TRUE';
+        return v === true || v === 1 || String(v).toUpperCase() === 'TRUE';
+      });
+    }
     
     // กรองตามรอบ
     if (params.round && params.round !== '') {
@@ -797,18 +969,23 @@ function getActivityReport(params) {
     });
     
     // ประมวลผลข้อมูล record
-    let records = recordData.slice(1).map(row => ({
-      idrecord: row[0],
-      timestamp: row[1] ? formatDate(new Date(row[1])) : 'ไม่ระบุ',
-      activity: row[2] || 'ไม่ระบุ',
-      activityDate: row[3] || 'ไม่ระบุ',
-      round: row[4] || 'ไม่ระบุ',
-      year: row[5] || 'ไม่ระบุ',
-      image: row[6] || '',
-      coordinates: row[7] || '',
-      user: row[8] || 'ไม่ระบุ',
-      userInfo: userMap[row[8]] || null
-    }));
+    let records = recordData.slice(1).map(row => {
+      const userDisplay = row[8] || 'ไม่ระบุ';
+      const pscode = extractPscode(userDisplay);
+      return ({
+        idrecord: row[0],
+        timestamp: row[1] ? formatDate(new Date(row[1])) : 'ไม่ระบุ',
+        activity: row[2] || 'ไม่ระบุ',
+        activityDate: row[3] || 'ไม่ระบุ',
+        round: row[4] || 'ไม่ระบุ',
+        year: row[5] || 'ไม่ระบุ',
+        image: row[6] || '',
+        coordinates: row[7] || '',
+        user: userDisplay,
+        pscode: pscode,
+        userInfo: userMap[pscode] || null
+      });
+    });
     
     // กรองตามเงื่อนไข
     if (params.year && params.year !== '') {

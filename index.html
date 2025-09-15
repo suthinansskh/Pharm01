@@ -192,6 +192,11 @@
                             แสดงผล
                         </button>
                     </div>
+					<div class="self-end">
+						 <button id="export-excel-btn" class="w-full md:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+							ส่งออก Excel
+						</button>
+					</div>
                 </div>
 
                 <div id="dashboard-results" class="space-y-4">
@@ -294,17 +299,18 @@
                         <div id="activities-table-container">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อกิจกรรม</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่จัด</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รอบ</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ปี</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
-                                    </tr>
+									<tr>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อกิจกรรม</th>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่จัด</th>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รอบ</th>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ปี</th>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
+										<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
+									</tr>
                                 </thead>
-                                <tbody id="activities-table-body" class="bg-white divide-y divide-gray-200">
+								<tbody id="activities-table-body" class="bg-white divide-y divide-gray-200">
                                     <tr>
-                                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+										<td colspan="6" class="px-6 py-4 text-center text-gray-500">
                                             กำลังโหลดข้อมูล...
                                         </td>
                                     </tr>
@@ -379,6 +385,7 @@
 		const yearFilter = document.getElementById('year-filter');
 		const roundFilter = document.getElementById('round-filter');
 		const loadDashboardBtn = document.getElementById('load-dashboard-btn');
+		const exportExcelBtn = document.getElementById('export-excel-btn');
 		const dashboardResults = document.getElementById('dashboard-results');
 		const dashboardLoader = document.getElementById('dashboard-loader');
 
@@ -809,16 +816,28 @@
 			try {
 				const response = await fetchFromScript('getInitialData');
 				if (response.status === 'success') {
-					currentActivities = response.activities;
-					
-					// Populate Activities
-					activitySelect.innerHTML = '<option value="">-- กรุณาเลือกกิจกรรม --</option>';
-					response.activities.forEach(activity => {
-						const option = document.createElement('option');
-						option.value = activity.name;
-						option.textContent = `${activity.name} (${activity.date}) รอบ ${activity.round} ปี ${activity.buddhistYear}`;
-						activitySelect.appendChild(option);
+					// filter เฉพาะกิจกรรมที่ active เท่านั้น
+					const onlyActive = (response.activities || []).filter(a => {
+						const v = (a && a.status !== undefined) ? a.status : 'TRUE';
+						return v === true || v === 1 || String(v).toUpperCase() === 'TRUE';
 					});
+					currentActivities = onlyActive;
+
+					// Populate Activities (เฉพาะ active)
+					activitySelect.innerHTML = '<option value="">-- กรุณาเลือกกิจกรรม --</option>';
+					if (onlyActive.length === 0) {
+						const option = document.createElement('option');
+						option.value = '';
+						option.textContent = 'ไม่มีรายการที่เปิดใช้งาน';
+						activitySelect.appendChild(option);
+					} else {
+						onlyActive.forEach(activity => {
+							const option = document.createElement('option');
+							option.value = activity.name;
+							option.textContent = `${activity.name} (${activity.date}) รอบ ${activity.round} ปี ${activity.buddhistYear}`;
+							activitySelect.appendChild(option);
+						});
+					}
 
 					// Populate Year Filter (ใช้ปี พ.ศ.)
 					yearFilter.innerHTML = '<option value="">-- ทุกปี --</option>';
@@ -998,6 +1017,13 @@
 					
 					console.log('🔄 Form reset completed');
 				} else {
+					// กรณีข้อมูลซ้ำ (กิจกรรม-รอบ-ปี-ผู้ใช้)
+					if (response.code === 'DUPLICATE') {
+						showMessage('❗ ไม่สามารถบันทึกได้: ผู้ใช้นี้บันทึกกิจกรรมนี้แล้ว (กิจกรรม-รอบ-ปี ซ้ำ)', 'error');
+						console.warn('Duplicate submission prevented:', response);
+						return;
+					}
+
 					console.error('❌ Server returned error status:', response);
 					throw new Error(response.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
 				}
@@ -1169,6 +1195,10 @@
 				}
 
 				const yearDisplay = activity.buddhistYear || activity.year || 'ไม่ระบุ';
+				const isActive = (activity.status === true || activity.status === 1 || String(activity.status).toUpperCase() === 'TRUE');
+				const statusBadge = isActive
+					? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">ใช้งาน</span>'
+					: '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">ปิด</span>';
 				return `
 				<tr class="hover:bg-gray-50">
 					<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -1183,10 +1213,15 @@
 					<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
 						${yearDisplay}
 					</td>
+					<td class="px-6 py-4 whitespace-nowrap text-sm">${statusBadge}</td>
 					<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
 						<button onclick="editActivity('${activity.name}')" 
 								class="text-indigo-600 hover:text-indigo-900 mr-3">
 							แก้ไข
+						</button>
+						<button onclick="toggleActivityStatus('${activity.name}')" 
+								class="text-yellow-600 hover:text-yellow-800 mr-3">
+							เปิด/ปิด
 						</button>
 						<button onclick="deleteActivity('${activity.name}')" 
 								class="text-red-600 hover:text-red-900">
@@ -1197,6 +1232,33 @@
 			`;}).join('');
 
 			activitiesTableBody.innerHTML = html;
+		}
+
+		// Toggle สถานะกิจกรรม (TRUE/FALSE)
+		async function toggleActivityStatus(activityName){
+			try{
+				const target = (currentActivities || []).find(a => a.name === activityName);
+				// ถ้าไม่เจอใน currentActivities ให้ลองจากตารางที่โหลดล่าสุด
+				const rowEl = Array.from(document.querySelectorAll('#activities-table-body tr')).find(tr => tr.querySelector('td')?.innerText?.trim() === activityName);
+				if(!target && !rowEl){
+					showMessage('ไม่พบกิจกรรมที่จะสลับสถานะ','error');
+					return;
+				}
+				const currentStatus = target?.status ?? 'TRUE';
+				const nextStatus = (currentStatus === true || currentStatus === 1 || String(currentStatus).toUpperCase() === 'TRUE') ? 'FALSE' : 'TRUE';
+				showMessage('กำลังอัปเดตสถานะ...','info');
+				const resp = await fetchFromScript('updateActivity', { originalName: activityName, status: nextStatus });
+				if(resp.status==='success'){
+					showMessage('อัปเดตสถานะสำเร็จ','success');
+					await loadActivitiesList();
+					await loadActivities();
+				}else{
+					showMessage('อัปเดตไม่สำเร็จ: '+(resp.message||''),'error');
+				}
+			}catch(err){
+				console.error('toggleActivityStatus error',err);
+				showMessage('เกิดข้อผิดพลาด: '+err.message,'error');
+			}
 		}
 
 		/**
@@ -1498,6 +1560,31 @@
 		activityForm.addEventListener('submit', handleFormSubmit);
 		addActivityForm.addEventListener('submit', handleAddActivity);
 		loadDashboardBtn.addEventListener('click', loadDashboardData);
+
+		// ส่งออก Excel สำหรับ Dashboard
+		exportExcelBtn.addEventListener('click', async (e) => {
+			 e.preventDefault();
+			 try {
+				 const year = yearFilter.value;
+				 const round = roundFilter.value;
+				 exportExcelBtn.disabled = true;
+				 exportExcelBtn.textContent = 'กำลังส่งออก...';
+
+				 const resp = await fetchFromScript('exportDashboardToExcel', { year, round });
+				 if (resp.status === 'success' && resp.file) {
+					 const linkHtml = `<div class="p-3 rounded border border-green-200 bg-green-50 text-green-700">ไฟล์ถูกสร้างแล้ว: <a class="underline font-medium" href="${resp.file.downloadUrl}" target="_blank" rel="noopener">ดาวน์โหลด (${resp.file.name})</a></div>`;
+					 dashboardResults.insertAdjacentHTML('afterbegin', linkHtml);
+				 } else {
+					 showMessage(resp.message || 'ไม่สามารถส่งออกไฟล์ได้', 'error');
+				 }
+			 } catch (err) {
+				 console.error('Export Excel error:', err);
+				 showMessage('เกิดข้อผิดพลาดระหว่างส่งออกไฟล์', 'error');
+			 } finally {
+				 exportExcelBtn.disabled = false;
+				 exportExcelBtn.textContent = 'ส่งออก Excel';
+			 }
+		});
 		
 		// เพิ่ม event listener สำหรับตรวจสอบผู้ใช้เมื่อกรอก PScode
 		userPscode.addEventListener('blur', (e) => {
